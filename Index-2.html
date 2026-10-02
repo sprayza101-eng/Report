@@ -6,6 +6,7 @@
 <title>ยอดขายมือถือประจำวัน</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 --bg:#f2f5f7;--card:#fff;--ink:#14202b;--mute:#667785;--line:#dbe3e9;--acc:#0b7a66;--acc-ink:#fff;--hi:#e6f4f0;--warn:#b4531a}
@@ -97,6 +98,9 @@ tr.has td{background:var(--hi)}
   <div class="sellers" id="sellers" hidden><h2>สรุปรายคน</h2><div id="sellerList" style="display:block"></div></div>
 </div>
 <script>
+// ===== ตั้งค่า Supabase (Project Settings > API) =====
+const CFG={url:'https://zthdbpuupbgrspdjrxqa.supabase.co',key:'sb_publishable_-9jCJAKX73tmvbq9KJUmvA_fCPSWWBf'};
+// =====================================================
 const $=id=>document.getElementById(id);
 let db=null,uid='local',catalog=[],sales=[],msales=[],unsub2=null,brand='ทั้งหมด',unsub=null,mode='day';
 const mine={};
@@ -111,20 +115,29 @@ $('seller').value=ls('ps_seller')||'';
 $('seller').onchange=()=>ls('ps_seller',$('seller').value.trim());
 
 $('upBtn').onclick=()=>$('file').click();
-const ALN={name:['name','ชื่อสินค้า','ชื่อ','ชื่อรุ่น','product name'],price:['set price','ราคา','price','ราคาขาย'],brand:['brand','แบรนด์','ยี่ห้อ']};
+const ALN={name:['name','ชื่อสินค้า','ชื่อ','ชื่อรุ่น','product name'],price:['set price','ราคา','price','ราคาขาย'],brand:['brand','แบรนด์','ยี่ห้อ'],model:['model','รุ่น']};
 const lc=v=>String(v==null?'':v).trim().toLowerCase();
+// ชื่อรุ่นไม่เอาสี: ใช้คอลัมน์ Model (ไม่มีสี) + เติมความจุจาก Name ถ้า Model ไม่มี
+const SPEC=/\d+\s*(gb|tb)|\d+\s*\+\s*\d+/i;
+function cleanName(name,model){
+  let m=String(model||'').replace(/\s+/g,' ').trim();
+  if(!m)return name.replace(/\s+/g,' ').trim();
+  if(!SPEC.test(m)){const x=name.match(/\b\d+\s*(?:GB|TB)\b/i)||name.match(/\d+\s*\+\s*\d+/);if(x)m+=' '+x[0].replace(/\s+/g,'')}
+  return m;
+}
 function readSheet(ws,sheetName){
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-  let hr=-1,ci=-1,pi=-1,bi=-1;
+  let hr=-1,ci=-1,pi=-1,bi=-1,mi=-1;
   for(let r=0;r<Math.min(rows.length,15);r++){
     const h=rows[r].map(lc);
     const n=h.findIndex(x=>ALN.name.includes(x)),p=h.findIndex(x=>ALN.price.includes(x));
-    if(n>=0&&p>=0){hr=r;ci=n;pi=p;bi=h.findIndex(x=>ALN.brand.includes(x));break}
+    if(n>=0&&p>=0){hr=r;ci=n;pi=p;bi=h.findIndex(x=>ALN.brand.includes(x));mi=h.findIndex(x=>ALN.model.includes(x));break}
   }
   if(hr<0)return null;
   const out=[];
   for(let r=hr+1;r<rows.length;r++){
-    const row=rows[r],n=String(row[ci]||'').trim();if(!n)continue;
+    const row=rows[r],raw=String(row[ci]||'').trim();if(!raw)continue;
+    const n=cleanName(raw,mi>=0?row[mi]:'');
     const p=Number(String(row[pi]).replace(/,/g,''))||0;
     const b=(bi>=0&&String(row[bi]).trim())?String(row[bi]).trim().toUpperCase():sheetName.trim().toUpperCase();
     out.push({n,p,b,c:sheetName});
@@ -139,14 +152,14 @@ $('file').onchange=async e=>{
     for(const name of wb.SheetNames){
       const items=readSheet(wb.Sheets[name],name);
       if(!items){skip.push(name);continue}
-      let add=0;items.forEach(i=>{if(!map.has(i.n)){map.set(i.n,i);add++}});
+      let add=0;items.forEach(i=>{const k=i.n.toLowerCase();if(!map.has(k)){map.set(k,i);add++}});
       rep.push(`${name} ${add} รุ่น`);
     }
     const items=[...map.values()].sort((a,b)=>a.b.localeCompare(b.b)||a.n.localeCompare(b.n));
     if(!items.length){say('ไม่พบหัวคอลัมน์ Name / Set Price ในทุกชีตของไฟล์');return}
     catalog=items;render();
     const info=`อ่าน ${rep.length} ชีต: ${rep.join(' · ')}`+(skip.length?` (ข้ามชีตที่ไม่มีคอลัมน์ Name/Set Price: ${skip.join(', ')})`:'');
-    if(db){await db.doc('catalog/main').set({items,updatedAt:Date.now(),file:f.name});say(info+' — อัปเดตให้ทุกคนแล้ว')}
+    if(db){const{error}=await db.from('catalog').upsert({id:'main',items,updated_at:new Date().toISOString()});if(error)throw error;say(info+' — อัปเดตให้ทุกคนแล้ว')}
     else say(info+' (ไม่ได้แชร์ให้คนอื่น)');
   }catch(err){say('อ่านไฟล์ไม่สำเร็จ: '+(err.message||err))}
   e.target.value='';
@@ -214,8 +227,8 @@ async function change(item,delta){
   if(qty>0){sales.push(row);mine[key]=row;if(date.slice(0,7)===$('month').value)msales.push(row)}else delete mine[key];
   render();
   if(!db){say('บันทึกในเครื่องเท่านั้น (ยังไม่ได้เชื่อมต่อระบบแชร์)');return true}
-  try{const ref=db.doc(`sales/${date}__${uid}__${key}`);qty>0?await ref.set(row):await ref.delete();return true}
-  catch(e){say('บันทึกไม่สำเร็จ: '+(e.message||e.code||'ไม่มีสิทธิ์เขียนข้อมูล'));return false}
+  try{const id=`${date}__${uid}__${key}`;const{error}=qty>0?await db.from('sales').upsert({id,...row}):await db.from('sales').delete().eq('id',id);if(error)throw error;return true}
+  catch(e){say('บันทึกไม่สำเร็จ: '+(e.message||'ตรวจสอบ policy ของตาราง'));return false}
 }
 
 // ---- render grouped by brand ----
@@ -270,21 +283,20 @@ function render(){
 }
 
 // ---- subscribe (day + month always live) ----
-function watch(){
-  if(unsub){unsub();unsub=null}
-  if(unsub2){unsub2();unsub2=null}
-  Object.keys(mine).forEach(k=>delete mine[k]);sales=[];msales=[];render();
-  if(!db)return;
-  unsub=db.collection('sales').where('date','==',$('date').value).onSnapshot(snap=>{
-    sales=snap.docs.map(d=>d.data());
-    Object.keys(mine).forEach(k=>delete mine[k]);
-    sales.forEach(s=>{if(s.uid===uid)mine[s.key]=s});
-    render();
-  },e=>say('โหลดยอดขายไม่สำเร็จ: '+(e.message||e.code)));
-  const m=$('month').value;
-  unsub2=db.collection('sales').where('date','>=',m+'-01').where('date','<=',m+'-31').onSnapshot(snap=>{
-    msales=snap.docs.map(d=>d.data());render();
-  },e=>say('โหลดยอดทั้งเดือนไม่สำเร็จ: '+(e.message||e.code)));
+let rt=0;
+async function refetch(){
+  if(!db)return;const tk=++rt,d=$('date').value,m=$('month').value;
+  const [a,b]=await Promise.all([db.from('sales').select('*').eq('date',d),db.from('sales').select('*').gte('date',m+'-01').lte('date',m+'-31')]);
+  if(tk!==rt)return;
+  if(a.error||b.error){say('โหลดยอดขายไม่สำเร็จ: '+(a.error||b.error).message);return}
+  sales=a.data;msales=b.data;
+  Object.keys(mine).forEach(k=>delete mine[k]);sales.forEach(s=>{if(s.uid===uid)mine[s.key]=s});render();
+}
+function watch(){Object.keys(mine).forEach(k=>delete mine[k]);sales=[];msales=[];render();refetch()}
+async function loadCatalog(){
+  const{data,error}=await db.from('catalog').select('items').eq('id','main').maybeSingle();
+  if(error){say('โหลดรายการสินค้าไม่สำเร็จ: '+error.message);return}
+  if(data&&data.items){catalog=data.items;render()}
 }
 function setMode(m){
   mode=m;$('tDay').className='btn'+(m==='day'?'':' ghost');$('tMonth').className='btn'+(m==='month'?'':' ghost');
@@ -296,9 +308,14 @@ $('month').onchange=watch;
 
 (async()=>{
   render();
-  try{const u=await claude.use('user');if(u&&u.id)uid=String(await u.id());db=await claude.use('db')}catch(e){db=null}
-  if(!db){say('โหมดออฟไลน์: ต้องเปิดผ่านลิงก์ที่ล็อกอิน claude.ai จึงจะแชร์ข้อมูลกับคนอื่นได้');return}
-  db.doc('catalog/main').onSnapshot(s=>{if(s.exists){catalog=s.data().items||[];fillList();render()}},()=>say('โหลดรายการสินค้าไม่สำเร็จ'));
+  uid=ls('ps_uid')||('u'+Math.random().toString(36).slice(2,10));ls('ps_uid',uid);
+  if(!CFG.url||CFG.url.startsWith('YOUR')){say('ยังไม่ได้ตั้งค่า Supabase — ใส่ URL และ anon key ที่หัวสคริปต์ (CFG)');return}
+  try{db=supabase.createClient(CFG.url,CFG.key)}catch(e){say('เชื่อมต่อ Supabase ไม่สำเร็จ: '+e.message);return}
+  await loadCatalog();
+  let tm;db.channel('ps-live')
+    .on('postgres_changes',{event:'*',schema:'public',table:'sales'},()=>{clearTimeout(tm);tm=setTimeout(refetch,150)})
+    .on('postgres_changes',{event:'*',schema:'public',table:'catalog'},loadCatalog)
+    .subscribe();
   watch();
 })();
 </script>
