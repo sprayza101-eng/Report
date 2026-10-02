@@ -24,10 +24,12 @@ input[type=text],input[type=date],input[type=search]{background:var(--card);bord
 input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 .btn{background:var(--acc);color:var(--acc-ink);border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
 .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
-.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.sum{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
 .sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .sum b{display:block;font-size:20px}
 .sum span{color:var(--mute);font-size:12px}
+.sh{font-weight:800;font-size:14px;margin:10px 0 6px}
+.sh.ip{color:var(--acc)}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
 .chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px}
 .chip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
@@ -86,16 +88,21 @@ tr.has td{background:var(--hi)}
   <div class="msg" id="msg"></div>
   <div class="tabs"><button class="btn" id="tDay">รายวัน</button><button class="btn ghost" id="tMonth">ทั้งเดือน</button></div>
   <div class="bar" id="monthBar" hidden><input type="month" id="month" aria-label="เดือน" style="padding:8px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px"></div>
+  <div class="sh">ยอดขาย Smartphone</div>
   <div class="sum">
     <div><b id="sUnits">0</b><span id="lUnits">เครื่องที่ขายวันนี้</span></div>
     <div><b id="sMoney">0</b><span id="lMoney">ยอดขายรวม (บาท)</span></div>
-    <div><b id="sModels">0</b><span>รุ่นที่มียอดขาย</span></div>
   </div>
-  <div class="sum" id="mStrip" style="grid-template-columns:1fr 1fr 1fr"><div style="grid-column:1/-1;background:var(--hi)"><span>ยอดขายสะสมทั้งเดือนนี้ (อัปเดตทันที)</span><b id="mTotal">0 เครื่อง · 0 บาท</b></div></div>
+  <div class="sh ip">ยอดขาย iPhone</div>
+  <div class="sum">
+    <div><b id="iUnits">0</b><span id="liUnits">เครื่องที่ขายวันนี้</span></div>
+    <div><b id="iMoney">0</b><span id="liMoney">ยอดขายรวม (บาท)</span></div>
+  </div>
+  <div class="sum" id="mStrip" style="grid-template-columns:1fr"><div style="grid-column:1/-1;background:var(--hi)"><span>ยอดขายสะสมทั้งเดือนนี้ (อัปเดตทันที)</span><b id="mTotal">0 เครื่อง · 0 บาท</b></div></div>
   <div class="chips" id="chips"></div>
   <div id="groups"></div>
   <div class="empty" id="empty" hidden></div>
-  <div class="sellers" id="sellers" hidden><h2>สรุปรายคน</h2><div id="sellerList" style="display:block"></div></div>
+  <div class="sellers" id="sellers" hidden><h2>ชื่อผู้กรอกยอด</h2><div id="sellerList" style="display:block"></div></div>
 </div>
 <script>
 // ===== ตั้งค่า Supabase (Project Settings > API) =====
@@ -272,10 +279,12 @@ function render(){
     });
     G.appendChild(g);
   });
-  const U=all.reduce((a,r)=>a+r.q,0),M=all.reduce((a,r)=>a+r.m,0);
-  $('sUnits').textContent=fmt(U);$('sMoney').textContent=fmt(M);$('sModels').textContent=all.length;
-  $('lUnits').textContent=isDay?'เครื่องที่ขายวันนี้':'เครื่องที่ขายทั้งเดือน';
-  $('lMoney').textContent=isDay?'ยอดขายรวม (บาท)':'ยอดขายรวมทั้งเดือน (บาท)';
+  const isIP=a=>/iphone/i.test(a.name+' '+a.b),isPad=a=>/ipad/i.test(a.name+' '+a.b);
+  const ip=all.filter(isIP),sp=all.filter(a=>!isIP(a)&&!isPad(a));
+  const sm=(arr,u,m)=>{$(u).textContent=fmt(arr.reduce((a,r)=>a+r.q,0));$(m).textContent=fmt(arr.reduce((a,r)=>a+r.m,0))};
+  sm(sp,'sUnits','sMoney');sm(ip,'iUnits','iMoney');
+  const lu=isDay?'เครื่องที่ขายวันนี้':'เครื่องที่ขายทั้งเดือน',lm=isDay?'ยอดขายรวม (บาท)':'ยอดขายรวมทั้งเดือน (บาท)';
+  $('lUnits').textContent=lu;$('liUnits').textContent=lu;$('lMoney').textContent=lm;$('liMoney').textContent=lm;
   const e=$('empty');e.hidden=all.length>0;e.textContent=isDay?'ยังไม่มียอดขายวันนี้ — พิมพ์ชื่อรุ่นด้านบนแล้วกด +':'เดือนนี้ยังไม่มียอดขาย';
   const by={};D.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price});
   const arr=Object.values(by).sort((a,b)=>b.m-a.m);$('sellers').hidden=!arr.length;
