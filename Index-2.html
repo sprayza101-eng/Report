@@ -67,6 +67,12 @@ tr.has td{background:var(--hi)}
 .sug button:last-child{border-bottom:0}
 .sug button:hover,.sug button.on{background:var(--hi)}
 .sug small{display:block;color:var(--mute);font-size:12px}
+.man{background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.man[hidden]{display:none}
+.man .r{display:flex;gap:8px}
+.man input{flex:1;min-width:0}
+.mt{background:none;border:0;color:var(--acc);font-weight:600;cursor:pointer;padding:0 0 8px;font-size:13px}
+.sug .none button{display:inline;width:auto;border:0;padding:0;color:var(--acc);font-weight:700;text-decoration:underline}
 .sug .none{padding:10px 12px;color:var(--mute);font-size:13px}
 </style>
 </head>
@@ -84,6 +90,16 @@ tr.has td{background:var(--hi)}
     <div class="mw"><input type="text" id="model" placeholder="พิมพ์ชื่อรุ่นบางส่วน เช่น iphone 15 128" autocomplete="off" aria-label="ชื่อรุ่น"><div class="sug" id="sug" hidden></div></div>
     <input type="number" id="addq" class="qty q2" value="1" min="1" inputmode="numeric" aria-label="จำนวน">
     <button class="btn plus" id="addBtn" aria-label="เพิ่มยอดขาย">+</button>
+  </div>
+  <button type="button" class="mt" id="manT">+ ไม่พบรุ่น? กรอกรุ่นและยอดขายเอง</button>
+  <div class="man" id="man" hidden>
+    <div class="r">
+      <input type="text" id="mName" placeholder="ชื่อรุ่น เช่น Samsung A07 (4+128)" maxlength="80" aria-label="ชื่อรุ่นที่กรอกเอง">
+    </div>
+    <div class="r">
+      <input type="number" id="mPrice" placeholder="ราคา (บาท)" min="0" inputmode="numeric" aria-label="ราคา">
+      <button class="btn plus" id="mAdd" type="button" aria-label="เพิ่มยอดขายที่กรอกเอง">+</button>
+    </div>
   </div>
   <div class="msg" id="msg"></div>
   <div class="tabs"><button class="btn" id="tDay">รายวัน</button><button class="btn ghost" id="tMonth">ทั้งเดือน</button></div>
@@ -189,7 +205,7 @@ function showSug(){
   const box=$('sug'),txt=$('model').value;picked=null;
   if(!txt.trim()){box.hidden=true;return}
   cur=suggest(txt);hi=0;box.innerHTML='';
-  if(!cur.length){const d=document.createElement('div');d.className='none';d.textContent='ไม่พบรุ่นที่ใกล้เคียง';box.appendChild(d);box.hidden=false;return}
+  if(!cur.length){const d=document.createElement('div');d.className='none';d.append('ไม่พบรุ่นที่ใกล้เคียง · ');const mb=document.createElement('button');mb.type='button';mb.textContent='กรอกเอง';mb.onmousedown=e=>e.preventDefault();mb.onclick=()=>openMan(txt.trim());d.appendChild(mb);box.appendChild(d);box.hidden=false;return}
   const nearFrom=cur.findIndex(x=>x.near);
   cur.forEach((it,idx)=>{
     if(idx===nearFrom){const d=document.createElement('div');d.className='none';d.textContent='รุ่นที่ใกล้เคียง';box.appendChild(d)}
@@ -210,6 +226,27 @@ async function addFromInput(){
   if(await change(r,n)){say(`เพิ่ม ${r.n} +${n}`);$('model').value='';$('addq').value=1;picked=null;$('sug').hidden=true;$('model').focus()}
 }
 $('addBtn').onclick=addFromInput;
+function openMan(name){
+  $('man').hidden=false;$('sug').hidden=true;
+  if(name)$('mName').value=name;
+  (name?$('mPrice'):$('mName')).focus();
+}
+$('manT').onclick=()=>{if($('man').hidden)openMan($('model').value.trim());else $('man').hidden=true};
+function guessBrand(name){
+  if(/iphone/i.test(name))return 'iPhone';
+  const w=name.split(' ')[0].toLowerCase();
+  const ex=catalog.map(i=>i.b).find(b=>b&&b.toLowerCase()===w);
+  return ex||(w.length>1?w.charAt(0).toUpperCase()+w.slice(1):'อื่นๆ');
+}
+async function addManual(){
+  const name=$('mName').value.replace(/\s+/g,' ').trim(),price=Math.round(Number($('mPrice').value));
+  if(!name){say('กรุณาใส่ชื่อรุ่น');$('mName').focus();return}
+  if($('mPrice').value===''||!(price>=0)){say('กรุณาใส่ราคา');$('mPrice').focus();return}
+  const item={n:name,p:price,b:guessBrand(name),k:hash('manual|'+name.toLowerCase()+'|'+price)};
+  if(await change(item,1)){say(`เพิ่ม ${name} +1 (กรอกเอง) — ปรับจำนวนได้ที่ตาราง`);$('mName').value='';$('mPrice').value='';$('man').hidden=true;$('model').value=''}
+}
+$('mAdd').onclick=addManual;
+['mName','mPrice'].forEach(id=>$(id).onkeydown=e=>{if(e.key==='Enter')addManual()});
 $('model').oninput=showSug;
 $('model').onfocus=()=>{if($('model').value.trim()&&!picked)showSug()};
 $('model').onblur=()=>setTimeout(()=>{$('sug').hidden=true},150);
@@ -227,7 +264,7 @@ async function change(item,delta){
   const date=$('date').value,seller=$('seller').value.trim();
   if(!seller){say('กรุณาใส่ชื่อผู้กรอกก่อน');$('seller').focus();return false}
   ls('ps_seller',seller);
-  const key=hash(item.n),qty=Math.max(0,(mine[key]?.qty||0)+delta);
+  const key=item.k||hash(item.n),qty=Math.max(0,(mine[key]?.qty||0)+delta);
   const row={date,uid,seller,key,name:item.n,price:item.p,b:item.b,qty,ts:Date.now()};
   const same=s=>s.uid===uid&&s.key===key&&s.date===date;
   sales=sales.filter(s=>!same(s));msales=msales.filter(s=>!same(s));
@@ -265,7 +302,7 @@ function render(){
       td().textContent=r.name;td('n').textContent=fmt(r.price);
       const qc=td('n');
       if(isDay){
-        const item=catalog.find(i=>hash(i.n)===r.k)||{n:r.name,p:r.price,b:r.b};
+        const item=catalog.find(i=>hash(i.n)===r.k)||{n:r.name,p:r.price,b:r.b,k:r.k};
         const my=mine[r.k]?.qty||0;
         const st=document.createElement('span');st.className='step';
         const mk=(l,d,dis)=>{const x=document.createElement('button');x.textContent=l;x.disabled=dis;x.onclick=()=>change(item,d);return x};
