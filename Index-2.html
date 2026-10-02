@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ยอดขายมือถือประจำวัน</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f2f5f7;--card:#fff;--ink:#14202b;--mute:#667785;--line:#dbe3e9;--acc:#0b7a66;--acc-ink:#fff;--hi:#e6f4f0;--warn:#b4531a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#8da0ae;--line:#2a3846;--acc:#34c3a5;--acc-ink:#06201a;--hi:#183530;--warn:#f0a066}}
+:root[data-theme="dark"]{--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#8da0ae;--line:#2a3846;--acc:#34c3a5;--acc-ink:#06201a;--hi:#183530;--warn:#f0a066}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans Thai",system-ui,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:14px}
+h1{font-size:22px;font-weight:800;margin:4px 0 2px}
+.sub{color:var(--mute);font-size:13px;margin:0 0 12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+input,button,select{font:inherit;color:inherit}
+input[type=text],input[type=date],input[type=search]{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.btn{background:var(--acc);color:var(--acc-ink);border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sum b{display:block;font-size:20px}
+.sum span{color:var(--mute);font-size:12px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px}
+.chip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card)}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.has td{background:var(--hi)}
+.qty{width:64px;text-align:center;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg)}
+.pr{width:92px;text-align:right}
+.brand{color:var(--mute);font-size:12px}
+.msg{color:var(--warn);font-size:13px;min-height:18px;margin:4px 0}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+.sellers{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sellers h2{font-size:15px;margin:0 0 6px}
+.sellers div{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+.add{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;gap:8px;margin-bottom:10px}
+.add input[type=text]{flex:1}
+.add .q2{width:64px;text-align:center}
+.plus{width:44px;font-size:22px;line-height:1;padding:6px}
+.tabs{display:flex;gap:6px;margin:6px 0 10px}
+.tabs .btn{flex:1}
+.grp{margin-bottom:12px}
+.gh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 12px;background:var(--hi);border:1px solid var(--line);border-radius:10px 10px 0 0;font-weight:700}
+.gh span{font-weight:400;color:var(--mute);font-size:13px}
+.grp .tbl{border-radius:0 0 10px 10px;border-top:0}
+.step{display:inline-flex;align-items:center;gap:4px}
+.step button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:16px;line-height:1}
+.step b{min-width:22px;text-align:center}
+.mw{position:relative;flex:1;min-width:0}
+.mw input{width:100%}
+.sug{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;max-height:300px;overflow-y:auto;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.sug button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 12px;cursor:pointer}
+.sug button:last-child{border-bottom:0}
+.sug button:hover,.sug button.on{background:var(--hi)}
+.sug small{display:block;color:var(--mute);font-size:12px}
+.sug .none{padding:10px 12px;color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ยอดขายมือถือประจำวัน</h1>
+  <p class="sub">พิมพ์ชื่อรุ่น แล้วกด + เพื่อเพิ่มยอดขาย ทุกคนเห็นยอดรวมเดียวกัน</p>
+  <div class="bar">
+    <input type="date" id="date" aria-label="วันที่">
+    <input type="text" id="seller" placeholder="ชื่อผู้กรอก / สาขา" maxlength="40" aria-label="ชื่อผู้กรอก">
+    <button class="btn ghost" id="upBtn">อัปโหลดไฟล์ Excel</button>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+  </div>
+  <div class="add">
+    <div class="mw"><input type="text" id="model" placeholder="พิมพ์ชื่อรุ่นบางส่วน เช่น iphone 15 128" autocomplete="off" aria-label="ชื่อรุ่น"><div class="sug" id="sug" hidden></div></div>
+    <input type="number" id="addq" class="qty q2" value="1" min="1" inputmode="numeric" aria-label="จำนวน">
+    <button class="btn plus" id="addBtn" aria-label="เพิ่มยอดขาย">+</button>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="tabs"><button class="btn" id="tDay">รายวัน</button><button class="btn ghost" id="tMonth">ทั้งเดือน</button></div>
+  <div class="bar" id="monthBar" hidden><input type="month" id="month" aria-label="เดือน" style="padding:8px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px"></div>
+  <div class="sum">
+    <div><b id="sUnits">0</b><span id="lUnits">เครื่องที่ขายวันนี้</span></div>
+    <div><b id="sMoney">0</b><span id="lMoney">ยอดขายรวม (บาท)</span></div>
+    <div><b id="sModels">0</b><span>รุ่นที่มียอดขาย</span></div>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div id="groups"></div>
+  <div class="empty" id="empty" hidden></div>
+  <div class="sellers" id="sellers" hidden><h2>สรุปรายคน</h2><div id="sellerList" style="display:block"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let db=null,uid='local',catalog=[],sales=[],brand='ทั้งหมด',unsub=null,mode='day';
+const mine={};
+const fmt=n=>Number(n||0).toLocaleString('th-TH');
+const hash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return h.toString(36)};
+const say=t=>{$('msg').textContent=t||''};
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
+const t=new Date(),p2=n=>String(n).padStart(2,'0');
+$('date').value=`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`;
+$('month').value=$('date').value.slice(0,7);
+$('seller').value=ls('ps_seller')||'';
+$('seller').onchange=()=>ls('ps_seller',$('seller').value.trim());
+
+$('upBtn').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const map=new Map();
+    for(const name of wb.SheetNames){
+      for(const r of XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:''})){
+        const n=String(r['Name']||'').trim();if(!n)continue;
+        if(!map.has(n))map.set(n,{n,p:Number(r['Set Price'])||0,b:String(r['Brand']||'อื่นๆ').trim()||'อื่นๆ',c:name});
+      }
+    }
+    const items=[...map.values()].sort((a,b)=>a.b.localeCompare(b.b)||a.n.localeCompare(b.n));
+    if(!items.length){say('ไม่พบคอลัมน์ Name / Set Price ในไฟล์');return}
+    catalog=items;fillList();render();
+    if(db){await db.doc('catalog/main').set({items,updatedAt:Date.now(),file:f.name});say(`อัปเดตแล้ว ${items.length} รุ่น (ทุกคนเห็นตรงกัน)`)}
+    else say(`โหลด ${items.length} รุ่น (ไม่ได้แชร์ให้คนอื่น)`);
+  }catch(err){say('อ่านไฟล์ไม่สำเร็จ: '+(err.message||err))}
+  e.target.value='';
+};
+function fillList(){}
+let picked=null,hi=0,cur=[];
+const norm=x=>x.toLowerCase().replace(/[^a-z0-9ก-๙+]+/g,' ').trim();
+function suggest(txt){
+  const toks=norm(txt).split(' ').filter(Boolean);if(!toks.length)return [];
+  const sc=catalog.map(i=>{
+    const n=norm(i.n),nc=n.replace(/ /g,'');let hit=0;
+    toks.forEach(t=>{if(n.includes(t)||nc.includes(t))hit++});
+    const full=hit===toks.length;
+    return {i,full,hit,pos:full?Math.min(...toks.map(t=>{const p=n.indexOf(t);return p<0?99:p})):99};
+  }).filter(x=>x.hit>0);
+  sc.sort((a,b)=>(b.full-a.full)||(b.hit-a.hit)||(a.pos-b.pos)||a.i.n.length-b.i.n.length);
+  return sc.slice(0,10).map(x=>({...x.i,near:!x.full}));
+}
+function showSug(){
+  const box=$('sug'),txt=$('model').value;picked=null;
+  if(!txt.trim()){box.hidden=true;return}
+  cur=suggest(txt);hi=0;box.innerHTML='';
+  if(!cur.length){const d=document.createElement('div');d.className='none';d.textContent='ไม่พบรุ่นที่ใกล้เคียง';box.appendChild(d);box.hidden=false;return}
+  const nearFrom=cur.findIndex(x=>x.near);
+  cur.forEach((it,idx)=>{
+    if(idx===nearFrom){const d=document.createElement('div');d.className='none';d.textContent='รุ่นที่ใกล้เคียง';box.appendChild(d)}
+    const bt=document.createElement('button');bt.type='button';if(idx===hi)bt.className='on';
+    bt.innerHTML='<span></span><small></small>';bt.children[0].textContent=it.n;bt.children[1].textContent=`${it.b} · ${fmt(it.p)} บาท`;
+    bt.onmousedown=e=>e.preventDefault();
+    bt.onclick=()=>choose(it);box.appendChild(bt);
+  });
+  box.hidden=false;
+}
+function choose(it){picked=it;$('model').value=it.n;$('sug').hidden=true;$('addq').focus();$('addq').select()}
+async function addFromInput(){
+  let r=picked;
+  if(!r){const q=$('model').value.trim().toLowerCase();r=catalog.find(i=>i.n.toLowerCase()===q)||null;
+    if(!r){const m=suggest(q).filter(x=>!x.near);if(m.length===1)r=m[0]}}
+  if(!r){showSug();say('เลือกรุ่นจากรายการที่แสดง แล้วกด +');return}
+  const n=Math.max(1,Math.floor(Number($('addq').value)||1));
+  if(await change(r,n)){say(`เพิ่ม ${r.n} +${n}`);$('model').value='';$('addq').value=1;picked=null;$('sug').hidden=true;$('model').focus()}
+}
+$('addBtn').onclick=addFromInput;
+$('model').oninput=showSug;
+$('model').onfocus=()=>{if($('model').value.trim()&&!picked)showSug()};
+$('model').onblur=()=>setTimeout(()=>{$('sug').hidden=true},150);
+$('model').onkeydown=e=>{
+  const bs=[...$('sug').querySelectorAll('button')];
+  if(e.key==='ArrowDown'&&bs.length){e.preventDefault();hi=Math.min(bs.length-1,hi+1)}
+  else if(e.key==='ArrowUp'&&bs.length){e.preventDefault();hi=Math.max(0,hi-1)}
+  else if(e.key==='Enter'){e.preventDefault();if(!picked&&bs.length&&!$('sug').hidden&&cur.length){choose(cur[hi]);return}addFromInput();return}
+  else return;
+  bs.forEach((b,i)=>b.className=i===hi?'on':'');bs[hi]&&bs[hi].scrollIntoView({block:'nearest'});
+};
+$('addq').onkeydown=e=>{if(e.key==='Enter')addFromInput()};
+
+async function change(item,delta){
+  if(mode!=='day'){setMode('day')}
+  const date=$('date').value,seller=$('seller').value.trim();
+  if(!seller){say('กรุณาใส่ชื่อผู้กรอกก่อน');$('seller').focus();return false}
+  ls('ps_seller',seller);
+  const key=hash(item.n),qty=Math.max(0,(mine[key]?.qty||0)+delta);
+  const row={date,uid,seller,key,name:item.n,price:item.p,b:item.b,qty,ts:Date.now()};
+  sales=sales.filter(s=>!(s.uid===uid&&s.key===key));
+  if(qty>0){sales.push(row);mine[key]=row}else delete mine[key];
+  render();
+  if(!db){say('บันทึกในเครื่องเท่านั้น (ยังไม่ได้เชื่อมต่อระบบแชร์)');return true}
+  try{const ref=db.doc(`sales/${date}__${uid}__${key}`);qty>0?await ref.set(row):await ref.delete();return true}
+  catch(e){say('บันทึกไม่สำเร็จ: '+(e.message||e.code||'ไม่มีสิทธิ์เขียนข้อมูล'));return false}
+}
+
+// ---- render grouped by brand ----
+function render(){
+  const isDay=mode==='day';
+  const agg={};
+  sales.forEach(s=>{const k=s.key,o=agg[k]||(agg[k]={name:s.name,price:s.price,b:s.b||(catalog.find(i=>hash(i.n)===k)||{}).b||'อื่นๆ',q:0,m:0});o.q+=s.qty;o.m+=s.qty*s.price});
+  const all=Object.keys(agg).map(k=>({k,...agg[k]}));
+  const brands=['ทั้งหมด',...[...new Set(all.map(a=>a.b))].sort()];
+  if(!brands.includes(brand))brand='ทั้งหมด';
+  $('chips').innerHTML='';
+  brands.forEach(b=>{const c=document.createElement('button');c.className='chip'+(b===brand?' on':'');c.textContent=b;c.onclick=()=>{brand=b;render()};$('chips').appendChild(c)});
+  const G=$('groups');G.innerHTML='';
+  const names=brands.slice(1).filter(b=>brand==='ทั้งหมด'||b===brand);
+  names.forEach(b=>{
+    const rows=all.filter(a=>a.b===b).sort((x,y)=>y.m-x.m);
+    const U=rows.reduce((a,r)=>a+r.q,0),M=rows.reduce((a,r)=>a+r.m,0);
+    const g=document.createElement('div');g.className='grp';
+    g.innerHTML='<div class="gh"><div></div><span></span></div><div class="tbl"><table><thead><tr><th>รุ่น</th><th class="n">ราคา</th><th class="n">จำนวน</th><th class="n">เป็นเงิน</th></tr></thead><tbody></tbody></table></div>';
+    g.querySelector('.gh div').textContent=b;
+    g.querySelector('.gh span').textContent=`${fmt(U)} เครื่อง · ${fmt(M)} บาท`;
+    const tb=g.querySelector('tbody');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      const td=(c)=>{const d=document.createElement('td');if(c)d.className=c;tr.appendChild(d);return d};
+      td().textContent=r.name;td('n').textContent=fmt(r.price);
+      const qc=td('n');
+      if(isDay){
+        const item=catalog.find(i=>hash(i.n)===r.k)||{n:r.name,p:r.price,b:r.b};
+        const my=mine[r.k]?.qty||0;
+        const st=document.createElement('span');st.className='step';
+        const mk=(l,d,dis)=>{const x=document.createElement('button');x.textContent=l;x.disabled=dis;x.onclick=()=>change(item,d);return x};
+        const tot=document.createElement('b');tot.textContent=r.q;
+        if(my){st.append(mk('−',-1),tot,mk('+',1));qc.appendChild(st);
+          if(r.q>my){const s2=document.createElement('div');s2.className='brand';s2.textContent=`ของฉัน ${my} / รวม ${r.q}`;qc.appendChild(s2)}}
+        else{qc.textContent=r.q}
+      }else qc.textContent=fmt(r.q);
+      td('n').textContent=fmt(r.m);
+      tb.appendChild(tr);
+    });
+    G.appendChild(g);
+  });
+  const U=all.reduce((a,r)=>a+r.q,0),M=all.reduce((a,r)=>a+r.m,0);
+  $('sUnits').textContent=fmt(U);$('sMoney').textContent=fmt(M);$('sModels').textContent=all.length;
+  $('lUnits').textContent=isDay?'เครื่องที่ขายวันนี้':'เครื่องที่ขายทั้งเดือน';
+  $('lMoney').textContent=isDay?'ยอดขายรวม (บาท)':'ยอดขายรวมทั้งเดือน (บาท)';
+  const e=$('empty');e.hidden=all.length>0;e.textContent=isDay?'ยังไม่มียอดขายวันนี้ — พิมพ์ชื่อรุ่นด้านบนแล้วกด +':'เดือนนี้ยังไม่มียอดขาย';
+  const by={};sales.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price});
+  const arr=Object.values(by).sort((a,b)=>b.m-a.m);$('sellers').hidden=!arr.length;
+  $('sellerList').innerHTML='';arr.forEach(o=>{const d=document.createElement('div');const a=document.createElement('span');a.textContent=o.name;const b=document.createElement('span');b.textContent=`${fmt(o.q)} เครื่อง · ${fmt(o.m)} บาท`;d.append(a,b);$('sellerList').appendChild(d)});
+}
+
+// ---- subscribe (day or month) ----
+function watch(){
+  if(unsub){unsub();unsub=null}
+  Object.keys(mine).forEach(k=>delete mine[k]);sales=[];render();
+  if(!db)return;
+  let q=db.collection('sales');
+  if(mode==='day')q=q.where('date','==',$('date').value);
+  else{const m=$('month').value;q=q.where('date','>=',m+'-01').where('date','<=',m+'-31')}
+  unsub=q.onSnapshot(snap=>{
+    sales=snap.docs.map(d=>d.data());
+    Object.keys(mine).forEach(k=>delete mine[k]);
+    if(mode==='day')sales.forEach(s=>{if(s.uid===uid)mine[s.key]=s});
+    render();
+  },e=>say('โหลดยอดขายไม่สำเร็จ: '+(e.message||e.code)));
+}
+function setMode(m){
+  mode=m;$('tDay').className='btn'+(m==='day'?'':' ghost');$('tMonth').className='btn'+(m==='month'?'':' ghost');
+  $('monthBar').hidden=m!=='month';$('date').disabled=false;watch();
+}
+$('tDay').onclick=()=>setMode('day');$('tMonth').onclick=()=>setMode('month');
+$('date').onchange=()=>{$('month').value=$('date').value.slice(0,7);watch()};
+$('month').onchange=watch;
+
+(async()=>{
+  render();
+  try{const u=await claude.use('user');if(u&&u.id)uid=String(await u.id());db=await claude.use('db')}catch(e){db=null}
+  if(!db){say('โหมดออฟไลน์: ต้องเปิดผ่านลิงก์ที่ล็อกอิน claude.ai จึงจะแชร์ข้อมูลกับคนอื่นได้');return}
+  db.doc('catalog/main').onSnapshot(s=>{if(s.exists){catalog=s.data().items||[];fillList();render()}},()=>say('โหลดรายการสินค้าไม่สำเร็จ'));
+  watch();
+})();
+</script>
+</body>
+</html>
