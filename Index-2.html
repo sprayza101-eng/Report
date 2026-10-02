@@ -39,7 +39,7 @@ tr.has td{background:var(--hi)}
 .qty{width:64px;text-align:center;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg)}
 .pr{width:92px;text-align:right}
 .brand{color:var(--mute);font-size:12px}
-.msg{color:var(--warn);font-size:13px;min-height:18px;margin:4px 0}
+.msg{color:var(--warn);font-size:13px;min-height:18px;margin:4px 0;overflow-wrap:anywhere}
 .empty{padding:28px;text-align:center;color:var(--mute)}
 .sellers{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .sellers h2{font-size:15px;margin:0 0 6px}
@@ -90,6 +90,7 @@ tr.has td{background:var(--hi)}
     <div><b id="sMoney">0</b><span id="lMoney">ยอดขายรวม (บาท)</span></div>
     <div><b id="sModels">0</b><span>รุ่นที่มียอดขาย</span></div>
   </div>
+  <div class="sum" id="mStrip" style="grid-template-columns:1fr 1fr 1fr"><div style="grid-column:1/-1;background:var(--hi)"><span>ยอดขายสะสมทั้งเดือนนี้ (อัปเดตทันที)</span><b id="mTotal">0 เครื่อง · 0 บาท</b></div></div>
   <div class="chips" id="chips"></div>
   <div id="groups"></div>
   <div class="empty" id="empty" hidden></div>
@@ -97,7 +98,7 @@ tr.has td{background:var(--hi)}
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let db=null,uid='local',catalog=[],sales=[],brand='ทั้งหมด',unsub=null,mode='day';
+let db=null,uid='local',catalog=[],sales=[],msales=[],unsub2=null,brand='ทั้งหมด',unsub=null,mode='day';
 const mine={};
 const fmt=n=>Number(n||0).toLocaleString('th-TH');
 const hash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return h.toString(36)};
@@ -110,21 +111,43 @@ $('seller').value=ls('ps_seller')||'';
 $('seller').onchange=()=>ls('ps_seller',$('seller').value.trim());
 
 $('upBtn').onclick=()=>$('file').click();
+const ALN={name:['name','ชื่อสินค้า','ชื่อ','ชื่อรุ่น','product name'],price:['set price','ราคา','price','ราคาขาย'],brand:['brand','แบรนด์','ยี่ห้อ']};
+const lc=v=>String(v==null?'':v).trim().toLowerCase();
+function readSheet(ws,sheetName){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let hr=-1,ci=-1,pi=-1,bi=-1;
+  for(let r=0;r<Math.min(rows.length,15);r++){
+    const h=rows[r].map(lc);
+    const n=h.findIndex(x=>ALN.name.includes(x)),p=h.findIndex(x=>ALN.price.includes(x));
+    if(n>=0&&p>=0){hr=r;ci=n;pi=p;bi=h.findIndex(x=>ALN.brand.includes(x));break}
+  }
+  if(hr<0)return null;
+  const out=[];
+  for(let r=hr+1;r<rows.length;r++){
+    const row=rows[r],n=String(row[ci]||'').trim();if(!n)continue;
+    const p=Number(String(row[pi]).replace(/,/g,''))||0;
+    const b=(bi>=0&&String(row[bi]).trim())?String(row[bi]).trim().toUpperCase():sheetName.trim().toUpperCase();
+    out.push({n,p,b,c:sheetName});
+  }
+  return out;
+}
 $('file').onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
   try{
-    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const map=new Map();
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const map=new Map(),rep=[],skip=[];
     for(const name of wb.SheetNames){
-      for(const r of XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:''})){
-        const n=String(r['Name']||'').trim();if(!n)continue;
-        if(!map.has(n))map.set(n,{n,p:Number(r['Set Price'])||0,b:String(r['Brand']||'อื่นๆ').trim()||'อื่นๆ',c:name});
-      }
+      const items=readSheet(wb.Sheets[name],name);
+      if(!items){skip.push(name);continue}
+      let add=0;items.forEach(i=>{if(!map.has(i.n)){map.set(i.n,i);add++}});
+      rep.push(`${name} ${add} รุ่น`);
     }
     const items=[...map.values()].sort((a,b)=>a.b.localeCompare(b.b)||a.n.localeCompare(b.n));
-    if(!items.length){say('ไม่พบคอลัมน์ Name / Set Price ในไฟล์');return}
-    catalog=items;fillList();render();
-    if(db){await db.doc('catalog/main').set({items,updatedAt:Date.now(),file:f.name});say(`อัปเดตแล้ว ${items.length} รุ่น (ทุกคนเห็นตรงกัน)`)}
-    else say(`โหลด ${items.length} รุ่น (ไม่ได้แชร์ให้คนอื่น)`);
+    if(!items.length){say('ไม่พบหัวคอลัมน์ Name / Set Price ในทุกชีตของไฟล์');return}
+    catalog=items;render();
+    const info=`อ่าน ${rep.length} ชีต: ${rep.join(' · ')}`+(skip.length?` (ข้ามชีตที่ไม่มีคอลัมน์ Name/Set Price: ${skip.join(', ')})`:'');
+    if(db){await db.doc('catalog/main').set({items,updatedAt:Date.now(),file:f.name});say(info+' — อัปเดตให้ทุกคนแล้ว')}
+    else say(info+' (ไม่ได้แชร์ให้คนอื่น)');
   }catch(err){say('อ่านไฟล์ไม่สำเร็จ: '+(err.message||err))}
   e.target.value='';
 };
@@ -151,7 +174,7 @@ function showSug(){
   cur.forEach((it,idx)=>{
     if(idx===nearFrom){const d=document.createElement('div');d.className='none';d.textContent='รุ่นที่ใกล้เคียง';box.appendChild(d)}
     const bt=document.createElement('button');bt.type='button';if(idx===hi)bt.className='on';
-    bt.innerHTML='<span></span><small></small>';bt.children[0].textContent=it.n;bt.children[1].textContent=`${it.b} · ${fmt(it.p)} บาท`;
+    bt.innerHTML='<span></span><small></small>';bt.children[0].textContent=it.n;bt.children[1].textContent=`${it.b}${it.c?' · '+it.c:''} · ${fmt(it.p)} บาท`;
     bt.onmousedown=e=>e.preventDefault();
     bt.onclick=()=>choose(it);box.appendChild(bt);
   });
@@ -181,14 +204,14 @@ $('model').onkeydown=e=>{
 $('addq').onkeydown=e=>{if(e.key==='Enter')addFromInput()};
 
 async function change(item,delta){
-  if(mode!=='day'){setMode('day')}
   const date=$('date').value,seller=$('seller').value.trim();
   if(!seller){say('กรุณาใส่ชื่อผู้กรอกก่อน');$('seller').focus();return false}
   ls('ps_seller',seller);
   const key=hash(item.n),qty=Math.max(0,(mine[key]?.qty||0)+delta);
   const row={date,uid,seller,key,name:item.n,price:item.p,b:item.b,qty,ts:Date.now()};
-  sales=sales.filter(s=>!(s.uid===uid&&s.key===key));
-  if(qty>0){sales.push(row);mine[key]=row}else delete mine[key];
+  const same=s=>s.uid===uid&&s.key===key&&s.date===date;
+  sales=sales.filter(s=>!same(s));msales=msales.filter(s=>!same(s));
+  if(qty>0){sales.push(row);mine[key]=row;if(date.slice(0,7)===$('month').value)msales.push(row)}else delete mine[key];
   render();
   if(!db){say('บันทึกในเครื่องเท่านั้น (ยังไม่ได้เชื่อมต่อระบบแชร์)');return true}
   try{const ref=db.doc(`sales/${date}__${uid}__${key}`);qty>0?await ref.set(row):await ref.delete();return true}
@@ -197,9 +220,10 @@ async function change(item,delta){
 
 // ---- render grouped by brand ----
 function render(){
-  const isDay=mode==='day';
+  const isDay=mode==='day';const D=isDay?sales:msales;
+  {const MU=msales.reduce((a,s)=>a+s.qty,0),MM=msales.reduce((a,s)=>a+s.qty*s.price,0);$('mTotal').textContent=`${fmt(MU)} เครื่อง · ${fmt(MM)} บาท`;$('mStrip').hidden=!isDay}
   const agg={};
-  sales.forEach(s=>{const k=s.key,o=agg[k]||(agg[k]={name:s.name,price:s.price,b:s.b||(catalog.find(i=>hash(i.n)===k)||{}).b||'อื่นๆ',q:0,m:0});o.q+=s.qty;o.m+=s.qty*s.price});
+  D.forEach(s=>{const k=s.key,o=agg[k]||(agg[k]={name:s.name,price:s.price,b:s.b||(catalog.find(i=>hash(i.n)===k)||{}).b||'อื่นๆ',q:0,m:0});o.q+=s.qty;o.m+=s.qty*s.price});
   const all=Object.keys(agg).map(k=>({k,...agg[k]}));
   const brands=['ทั้งหมด',...[...new Set(all.map(a=>a.b))].sort()];
   if(!brands.includes(brand))brand='ทั้งหมด';
@@ -240,29 +264,31 @@ function render(){
   $('lUnits').textContent=isDay?'เครื่องที่ขายวันนี้':'เครื่องที่ขายทั้งเดือน';
   $('lMoney').textContent=isDay?'ยอดขายรวม (บาท)':'ยอดขายรวมทั้งเดือน (บาท)';
   const e=$('empty');e.hidden=all.length>0;e.textContent=isDay?'ยังไม่มียอดขายวันนี้ — พิมพ์ชื่อรุ่นด้านบนแล้วกด +':'เดือนนี้ยังไม่มียอดขาย';
-  const by={};sales.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price});
+  const by={};D.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price});
   const arr=Object.values(by).sort((a,b)=>b.m-a.m);$('sellers').hidden=!arr.length;
   $('sellerList').innerHTML='';arr.forEach(o=>{const d=document.createElement('div');const a=document.createElement('span');a.textContent=o.name;const b=document.createElement('span');b.textContent=`${fmt(o.q)} เครื่อง · ${fmt(o.m)} บาท`;d.append(a,b);$('sellerList').appendChild(d)});
 }
 
-// ---- subscribe (day or month) ----
+// ---- subscribe (day + month always live) ----
 function watch(){
   if(unsub){unsub();unsub=null}
-  Object.keys(mine).forEach(k=>delete mine[k]);sales=[];render();
+  if(unsub2){unsub2();unsub2=null}
+  Object.keys(mine).forEach(k=>delete mine[k]);sales=[];msales=[];render();
   if(!db)return;
-  let q=db.collection('sales');
-  if(mode==='day')q=q.where('date','==',$('date').value);
-  else{const m=$('month').value;q=q.where('date','>=',m+'-01').where('date','<=',m+'-31')}
-  unsub=q.onSnapshot(snap=>{
+  unsub=db.collection('sales').where('date','==',$('date').value).onSnapshot(snap=>{
     sales=snap.docs.map(d=>d.data());
     Object.keys(mine).forEach(k=>delete mine[k]);
-    if(mode==='day')sales.forEach(s=>{if(s.uid===uid)mine[s.key]=s});
+    sales.forEach(s=>{if(s.uid===uid)mine[s.key]=s});
     render();
   },e=>say('โหลดยอดขายไม่สำเร็จ: '+(e.message||e.code)));
+  const m=$('month').value;
+  unsub2=db.collection('sales').where('date','>=',m+'-01').where('date','<=',m+'-31').onSnapshot(snap=>{
+    msales=snap.docs.map(d=>d.data());render();
+  },e=>say('โหลดยอดทั้งเดือนไม่สำเร็จ: '+(e.message||e.code)));
 }
 function setMode(m){
   mode=m;$('tDay').className='btn'+(m==='day'?'':' ghost');$('tMonth').className='btn'+(m==='month'?'':' ghost');
-  $('monthBar').hidden=m!=='month';$('date').disabled=false;watch();
+  $('monthBar').hidden=m!=='month';render();
 }
 $('tDay').onclick=()=>setMode('day');$('tMonth').onclick=()=>setMode('month');
 $('date').onchange=()=>{$('month').value=$('date').value.slice(0,7);watch()};
