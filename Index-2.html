@@ -44,6 +44,8 @@ tr.has td{background:var(--hi)}
 .qty{width:64px;text-align:center;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg)}
 .pr{width:92px;text-align:right}
 .brand{color:var(--mute);font-size:12px}
+.tap{cursor:pointer}
+.del{display:block;margin-top:6px;border:1px solid var(--warn);color:var(--warn);background:transparent;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;text-align:left}
 .msg{color:var(--warn);font-size:13px;min-height:18px;margin:4px 0;overflow-wrap:anywhere}
 .empty{padding:28px;text-align:center;color:var(--mute)}
 .sellers{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
@@ -277,6 +279,17 @@ async function change(item,delta){
   catch(e){say('บันทึกไม่สำเร็จ: '+(e.message||'ตรวจสอบ policy ของตาราง'));return false}
 }
 
+async function delModel(r){
+  if(!confirm(`ลบ ${r.name} ออกจากยอดวันนี้ ${r.q} เครื่อง (ของทุกคน)?`))return;
+  const date=$('date').value,key=r.k;
+  const same=x=>x.key===key&&x.date===date;
+  sales=sales.filter(x=>!same(x));msales=msales.filter(x=>!same(x));delete mine[key];
+  render();
+  if(!db){say('ลบในเครื่องเท่านั้น (ยังไม่ได้เชื่อมต่อระบบแชร์)');return}
+  try{const{error}=await db.from('sales').delete().eq('date',date).eq('key',key);if(error)throw error;say(`ลบ ${r.name} แล้ว`)}
+  catch(e){say('ลบไม่สำเร็จ: '+(e.message||'ตรวจสอบ policy ของตาราง'));refetch&&refetch()}
+}
+
 // ---- render grouped by brand ----
 function render(){
   const isDay=mode==='day';const D=isDay?sales:msales;
@@ -301,11 +314,16 @@ function render(){
     rows.forEach(r=>{
       const tr=document.createElement('tr');
       const td=(c)=>{const d=document.createElement('td');if(c)d.className=c;tr.appendChild(d);return d};
-      td().textContent=r.name;td('n').textContent=fmt(r.price);
+      const nt=td();nt.textContent=r.name;td('n').textContent=fmt(r.price);
       const qc=td('n');
       if(isDay){
         const my=mine[r.k]?.qty||0;
         qc.textContent=r.q;
+        nt.classList.add('tap');
+        nt.onclick=()=>{
+          const ex=nt.querySelector('.del');if(ex){ex.remove();return}
+          const d=document.createElement('button');d.type='button';d.className='del';d.textContent=`🗑 ลบ ${r.name} ออก (${r.q} เครื่อง)`;
+          d.onclick=e=>{e.stopPropagation();delModel(r)};nt.appendChild(d)};
         if(my&&r.q>my){const s2=document.createElement('div');s2.className='brand';s2.textContent=`ของฉัน ${my} / รวม ${r.q}`;qc.appendChild(s2)}
       }else qc.textContent=fmt(r.q);
       td('n').textContent=fmt(r.m);
