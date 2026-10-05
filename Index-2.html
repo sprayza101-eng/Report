@@ -320,8 +320,8 @@ function render(){
   const isDay=mode==='day';const D=isDay?sales:msales;
   {const MU=msales.reduce((a,s)=>a+s.qty,0),MM=msales.reduce((a,s)=>a+s.qty*s.price,0);$('mTotal').textContent=`${fmt(MU)} เครื่อง · ${fmt(MM)} บาท`;$('mStrip').hidden=!isDay}
   const agg={};
-  D.forEach(s=>{const k=s.key,o=agg[k]||(agg[k]={name:s.name,price:s.price,b:s.b||(catalog.find(i=>hash(i.n)===k)||{}).b||'อื่นๆ',q:0,m:0});o.q+=s.qty;o.m+=s.qty*s.price});
-  const all=Object.keys(agg).map(k=>({k,...agg[k]}));
+  D.forEach(s=>{const k=s.key,ak=k+'|'+s.price,o=agg[ak]||(agg[ak]={k,name:s.name,price:s.price,b:s.b||(catalog.find(i=>hash(i.n)===k)||{}).b||'อื่นๆ',q:0,m:0});o.q+=s.qty;o.m+=s.qty*s.price});
+  const all=Object.keys(agg).map(ak=>agg[ak]);
   const brands=['ทั้งหมด',...[...new Set(all.map(a=>a.b))].sort()];
   if(!brands.includes(brand))brand='ทั้งหมด';
   $('chips').innerHTML='';
