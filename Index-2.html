@@ -128,7 +128,7 @@ tr.has td{background:var(--hi)}
   <div class="chips" id="chips"></div>
   <div id="groups"></div>
   <div class="empty" id="empty" hidden></div>
-  <div class="sellers" id="sellers" hidden><h2>ชื่อผู้กรอกยอด</h2><div id="sellerList" style="display:block"></div></div>
+  <div class="sellers" id="sellers" hidden><h2>ผู้กรอกยอดล่าสุด (3 คน)</h2><div id="sellerList" style="display:block"></div></div>
 </div>
 <script>
 // ===== ตั้งค่า Supabase (Project Settings > API) =====
@@ -363,9 +363,9 @@ function render(){
   const lu=isDay?'เครื่องที่ขายวันนี้':'เครื่องที่ขายทั้งเดือน',lm=isDay?'ยอดขายรวม (บาท)':'ยอดขายรวมทั้งเดือน (บาท)';
   $('lUnits').textContent=lu;$('liUnits').textContent=lu;$('lMoney').textContent=lm;$('liMoney').textContent=lm;
   const e=$('empty');e.hidden=all.length>0;e.textContent=isDay?'ยังไม่มียอดขายวันนี้ — พิมพ์ชื่อรุ่นด้านบนแล้วกด +':'เดือนนี้ยังไม่มียอดขาย';
-  const by={};D.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price});
-  const arr=Object.values(by).sort((a,b)=>b.m-a.m);$('sellers').hidden=!arr.length;
-  $('sellerList').innerHTML='';arr.forEach(o=>{const d=document.createElement('div');const a=document.createElement('span');a.textContent=o.name;const b=document.createElement('span');b.textContent=`${fmt(o.q)} เครื่อง · ${fmt(o.m)} บาท`;d.append(a,b);$('sellerList').appendChild(d)});
+  const by={};D.forEach(s=>{const o=by[s.uid]||(by[s.uid]={name:s.seller||'ไม่ระบุชื่อ',q:0,m:0,ts:0});if(s.seller)o.name=s.seller;o.q+=s.qty;o.m+=s.qty*s.price;o.ts=Math.max(o.ts,Number(s.ts)||0)});
+  const arr=Object.values(by).sort((a,b)=>b.ts-a.ts).slice(0,3);$('sellers').hidden=!arr.length;
+  $('sellerList').innerHTML='';arr.forEach((o,i)=>{const d=document.createElement('div');const a=document.createElement('span');a.textContent=o.name+(i===0?' (ล่าสุด)':'');if(i===0)a.style.fontWeight='800';const b=document.createElement('span');b.textContent=`${fmt(o.q)} เครื่อง · ${fmt(o.m)} บาท`;d.append(a,b);$('sellerList').appendChild(d)});
 }
 
 // ---- subscribe (day + month always live) ----
