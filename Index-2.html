@@ -58,7 +58,8 @@ tr.has td{background:var(--hi)}
 .tabs{display:flex;gap:6px;margin:6px 0 10px}
 .tabs .btn{flex:1}
 .rl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
-#monthBar .btn{padding:7px 10px;font-size:13px}
+.rsum{font-size:13px;color:var(--mute)}
+#rPanel[hidden]{display:none}
 .grp{margin-bottom:12px}
 .gh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 12px;background:var(--hi);border:1px solid var(--line);border-radius:10px 10px 0 0;font-weight:700}
 .gh span{font-weight:400;color:var(--mute);font-size:13px}
@@ -117,10 +118,12 @@ tr.has td{background:var(--hi)}
   <div class="tabs"><button class="btn" id="tDay">รายวัน</button><button class="btn ghost" id="tMonth">เลือกช่วงวันที่</button></div>
   <input type="month" id="month" hidden aria-hidden="true">
   <div class="bar" id="monthBar" hidden>
+    <button type="button" class="btn ghost" id="rToggle" aria-expanded="false" aria-controls="rPanel">📅 เลือกวันที่</button>
+    <span class="rsum" id="rSum"></span>
+  </div>
+  <div class="bar" id="rPanel" hidden>
     <label class="rl">ตั้งแต่ <input type="date" id="rFrom" aria-label="วันเริ่มต้น"></label>
     <label class="rl">ถึง <input type="date" id="rTo" aria-label="วันสิ้นสุด"></label>
-    <button type="button" class="btn ghost" id="rMonth">เดือนของวันที่เลือก</button>
-    <button type="button" class="btn ghost" id="r7">7 วันล่าสุด</button>
   </div>
   <div class="sh">ยอดขาย Smartphone</div>
   <div class="sum">
@@ -157,8 +160,10 @@ $('date').value=`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`;
 $('month').value=$('date').value.slice(0,7);
 const ymd=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
 function setRange(f,e){$('rFrom').value=f;$('rTo').value=e}
+const thD=ds=>ds?new Date(ds+'T00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}):'';
+const rangeText=()=>$('rSum').textContent=`${thD($('rFrom').value)} – ${thD($('rTo').value)}`;
 function monthRange(ds){const [y,m]=ds.split('-').map(Number);return [`${y}-${p2(m)}-01`,ymd(new Date(y,m,0))]}
-setRange(...monthRange($('date').value));
+setRange(...monthRange($('date').value));rangeText();
 $('seller').value=ls('ps_seller')||'';
 $('seller').onchange=()=>ls('ps_seller',$('seller').value.trim());
 
@@ -406,15 +411,14 @@ async function loadCatalog(){
 }
 function setMode(m){
   mode=m;$('tDay').className='btn'+(m==='day'?'':' ghost');$('tMonth').className='btn'+(m==='month'?'':' ghost');
-  $('monthBar').hidden=m!=='month';render();
+  $('monthBar').hidden=m!=='month';if(m!=='month'){$('rPanel').hidden=true;$('rToggle').setAttribute('aria-expanded','false')}render();
 }
 $('tDay').onclick=()=>setMode('day');$('tMonth').onclick=()=>setMode('month');
 $('date').onchange=()=>{$('month').value=$('date').value.slice(0,7);watch()};
 $('month').onchange=watch;
-$('rFrom').onchange=()=>{if(!$('rFrom').value)$('rFrom').value=$('date').value;if($('rTo').value<$('rFrom').value)$('rTo').value=$('rFrom').value;refetch()};
-$('rTo').onchange=()=>{if(!$('rTo').value)$('rTo').value=$('date').value;if($('rFrom').value>$('rTo').value)$('rFrom').value=$('rTo').value;refetch()};
-$('rMonth').onclick=()=>{setRange(...monthRange($('date').value));refetch()};
-$('r7').onclick=()=>{const e=new Date();const f=new Date();f.setDate(e.getDate()-6);setRange(ymd(f),ymd(e));refetch()};
+$('rFrom').onchange=()=>{if(!$('rFrom').value)$('rFrom').value=$('date').value;if($('rTo').value<$('rFrom').value)$('rTo').value=$('rFrom').value;rangeText();refetch()};
+$('rTo').onchange=()=>{if(!$('rTo').value)$('rTo').value=$('date').value;if($('rFrom').value>$('rTo').value)$('rFrom').value=$('rTo').value;rangeText();refetch()};
+$('rToggle').onclick=()=>{const h=$('rPanel').hidden;$('rPanel').hidden=!h;$('rToggle').setAttribute('aria-expanded',String(h))};
 
 (async()=>{
   render();
